@@ -3,9 +3,9 @@ from analyzers.failure_analyzer import FailureAnalyzer
 from analyzers.admission_analyzer import AdmissionAnalyzer
 from analyzers.metadata_analyzer import MetadataAnalyzer
 from analyzers.statistics_analyzer import StatisticsAnalyzer
-from analyzers.runtime_breakdown_analyzer import (
-    RuntimeBreakdownAnalyzer
-)
+from analyzers.runtime_breakdown_analyzer import RuntimeBreakdownAnalyzer
+from utils.math_utils import safe_divide, calculate_percentage
+
 
 class AnalyticsEngine:
 
@@ -60,16 +60,8 @@ class AnalyticsEngine:
             )
 
             if avg_runtime > 0:
-
-                skew_pct = (
-                    (
-                        max_runtime
-                        - avg_runtime
-                    )
-                    /
-                    avg_runtime
-                ) * 100
-
+                skew_pct = calculate_percentage(max_runtime - avg_runtime, avg_runtime)
+                
                 if skew_pct > 100:
 
                     findings.append(

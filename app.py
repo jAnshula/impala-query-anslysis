@@ -6,7 +6,6 @@ import plotly.express as px
 from services.execution_profile_builder import ExecutionProfileBuilder
 from services.analytics_engine import AnalyticsEngine
 from intelligence.intelligence_engine import IntelligenceEngine
-from services.analytics_engine import AnalyticsEngine
 from intelligence.root_cause_engine import RootCauseEngine
 from intelligence.recommendation_engine import RecommendationEngine
 from intelligence.root_cause_chain import RootCauseChainBuilder
@@ -75,14 +74,15 @@ uploaded = st.file_uploader(
 
 
 if uploaded:
-    profile_text = (
-        uploaded
-        .read()
-        .decode(
-            "utf-8",
-            errors="ignore"
-        )
-    )
+    try:
+        profile_text = uploaded.read().decode("utf-8", errors="ignore")
+        if not profile_text or len(profile_text.strip()) == 0:
+            st.error("Uploaded file is empty")
+            st.stop()
+    except Exception as e:
+        st.error(f"Failed to read file: {str(e)}")
+        st.stop()
+
     # only reset when new file uploaded
     if (
         st.session_state.get(
@@ -313,7 +313,7 @@ with right:
                             planning_ms
                         ),
                     "Percent":
-                        format_duration(planning_pct)
+                        f"{planning_pct:.1f}%"
                 },
                 {
                     "Phase": "Admission",
@@ -322,7 +322,7 @@ with right:
                             admission_ms
                         ),
                     "Percent":
-                        format_duration(admission_pct)
+                        f"{admission_pct:.1f}%"
                 },
                 {
                     "Phase": "Execution",
@@ -331,7 +331,7 @@ with right:
                             execution_ms
                         ),
                     "Percent":
-                        format_duration(execution_pct)
+                        f"{execution_pct:.1f}%"
                 }
             ]
         )
@@ -342,11 +342,9 @@ with right:
 
     k1,k2,k3,k4,k5 = st.columns(5)
 
-    memory = getattr(
-        profile,
-        "memory_metrics",
-        {}
-    ) or {}
+    memory = getattr(profile, "memory_metrics", {})
+    if not isinstance(memory, dict):
+        memory = {}
 
     k1.metric(
         "Planning",
@@ -511,10 +509,11 @@ with right:
         scan = getattr(
             profile,
             "scan_metrics",
-            {}
-        ) or {}
+            {})
+        if not isinstance(scan, dict):
+            scan = {}
 
-        c1,c2,c3,c4 = st.columns(4)
+        c1, c2, c3, c4 = st.columns(4)
 
         files_scanned = scan.get(
             "files_scanned",
@@ -750,9 +749,6 @@ with right:
         else:
             st.info("No runtime metrics available to rank operators.")
 
-        st.dataframe(
-            ranking_df
-        )
         st.header(
             "Scan Analysis"
         )

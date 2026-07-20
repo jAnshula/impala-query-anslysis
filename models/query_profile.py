@@ -1,9 +1,13 @@
 from dataclasses import dataclass, field
-from typing import Dict, Any, List
 from dataclasses import field
 from models.query_info import QueryInfo
 from models.timeline import Timeline
 from models.exec_summary import ExecSummary
+from typing import Dict, List, Optional, Any
+from models.fragment_instance import FragmentInstance  # Import actual type
+from models.cpu_metric import CPUMetric
+from models.network_metric import NetworkMetric
+from models.operator_metric import OperatorMetric
 
 
 @dataclass
@@ -47,20 +51,20 @@ class QueryProfile:
         default_factory=dict
     )
 
-    fragment_instances: List[Any] = field(
+    fragment_instances: List[FragmentInstance] = field(
         default_factory=list
     )
 
-    cpu_metrics: list = field(
-    default_factory=list
+    cpu_metrics: List[CPUMetric] = field(
+        default_factory=list
     )
 
-    network_metrics: dict = field(
-    default_factory=dict
+    network_metrics: Dict[str, Any] = field(
+        default_factory=dict
     )
-
-    operator_metrics: list = field(
-    default_factory=list
+    
+    operator_metrics: List[OperatorMetric] = field(
+        default_factory=list
     )
 
 

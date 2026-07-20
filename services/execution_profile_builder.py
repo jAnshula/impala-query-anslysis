@@ -1,3 +1,4 @@
+import logging
 from models.query_profile import QueryProfile
 
 from extractors.summary_extractor import (
@@ -115,9 +116,10 @@ class ExecutionProfileBuilder:
                 peak_summary.get("peak_memory_gb", 0)
             )
 
+            peak_memory_gb = peak_summary.get("peak_memory_gb", 0)
+            memory_metrics["peak_memory_gb"] = peak_memory_gb
             memory_metrics["peak_memory_mb"] = round(
-                peak_summary.get("peak_memory_gb", 0) * 1024,
-                2
+                peak_memory_gb * 1024, 2
             )
 
             memory_metrics["components"] = (
@@ -146,10 +148,16 @@ class ExecutionProfileBuilder:
             raw_profile=text
         )
 
+        print("PEAK SUMMARY =", peak_summary)
         print("=" * 80)
         print("QUERY ID:", query_info.query_id)
         print("Fragments extracted:", len(fragment_instances))
         print("=" * 80)
+
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"Peak summary: {peak_summary}")
+        logger.debug(f"Query ID: {query_info.query_id}, Fragments: {len(fragment_instances)}")
 
         return profile
 

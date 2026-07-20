@@ -75,7 +75,11 @@ class ExecutionAnalyzer:
                 "components": []
             }
 
-        max_peak = max(f["peak_memory"] for f in fragment_summary.values())
+        max_peak = max(
+        (f["peak_memory"] for f in fragment_summary.values()),
+        default=0
+        )
+
 
         # Build component breakdown for UI
         components = []
