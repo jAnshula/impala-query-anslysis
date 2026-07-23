@@ -3,13 +3,21 @@
 # app.py
 # ============================================================
 
-import io
-from datetime import datetime
-
+import logging
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+
+
+# Performance thresholds (configurable)
+PLANNING_PERCENT_THRESHOLD = 50
+ADMISSION_PERCENT_THRESHOLD = 20
+EXECUTION_PERCENT_THRESHOLD = 80
+FILES_SCANNED_THRESHOLD = 500
+PEAK_MEMORY_THRESHOLD_GB = 50
+NETWORK_THRESHOLD_MB = 1000
+CPU_THRESHOLD_SECONDS = 3600
 
 # Optional Components
 try:
@@ -107,19 +115,20 @@ st.markdown(
 # Utility Functions
 # ============================================================
 
-
 def format_duration(ms):
-
     if ms is None:
         return "00:00:00"
-
     try:
         ms = int(ms)
-    except Exception:
+    except (ValueError, TypeError):
+        # Only catch conversion errors, not unexpected exceptions
+        return str(ms)
+    except Exception as e:
+        import logging
+        logging.warning(f"Unexpected error formatting duration {ms}: {e}")
         return str(ms)
 
     seconds = ms // 1000
-
     h = seconds // 3600
     m = (seconds % 3600) // 60
     s = seconds % 60
@@ -361,20 +370,31 @@ with st.sidebar:
     # ============================================================
     # Query Overview
     # ============================================================
-
+    
     if page == "🏠 Query Overview":
 
         st.title("🏠 Query Overview")
 
+        # Validate profile exists
+        if not profile or not hasattr(profile, 'query_info'):
+            st.error("Failed to parse query profile. Please check the input.")
+            st.stop()
+
         query = profile.query_info
-        timeline = profile.timeline
+        
+        if not query:
+            st.error("Failed to extract query information.")
+            st.stop()
+        
+        timeline = profile.timeline or {}
         memory = profile.memory_metrics or {}
         scan = profile.scan_metrics or {}
 
-        planning_ms = timeline.get("planning_ms", 0)
-        admission_ms = timeline.get("admission_ms", 0)
-        execution_ms = timeline.get("execution_ms", 0)
-        total_ms = timeline.get("total_ms", 0)
+        # Safe dict access with defaults
+        planning_ms = timeline.get("planning_ms", 0) if isinstance(timeline, dict) else 0
+        admission_ms = timeline.get("admission_ms", 0) if isinstance(timeline, dict) else 0
+        execution_ms = timeline.get("execution_ms", 0) if isinstance(timeline, dict) else 0
+        total_ms = timeline.get("total_ms", 0) if isinstance(timeline, dict) else 0
 
         if total_ms == 0:
             total_ms = (
@@ -388,29 +408,17 @@ with st.sidebar:
         # =====================================================
 
         st.subheader("Query Information")
-
         c1, c2 = st.columns(2)
-
         with c1:
-
-            st.markdown(f"**Query ID**  \n`{query.query_id}`")
-
-            st.markdown(f"**User**  \n{query.user}")
-
-            st.markdown(f"**Coordinator**  \n{query.coordinator}")
-
-            st.markdown(f"**Pool**  \n{query.pool}")
-
+            st.markdown(f"**Query ID**  \n`{getattr(query, 'query_id', 'N/A')}`")
+            st.markdown(f"**User**  \n{getattr(query, 'user', 'N/A')}")
+            st.markdown(f"**Coordinator**  \n{getattr(query, 'coordinator', 'N/A')}")
+            st.markdown(f"**Pool**  \n{getattr(query, 'pool', 'N/A')}")
         with c2:
-
-            st.markdown(f"**State**  \n{query.state}")
-
-            st.markdown(f"**Query Type**  \n{query.query_type}")
-
-            st.markdown(f"**Start Time**  \n{query.start_time}")
-
-            st.markdown(f"**End Time**  \n{query.end_time}")
-
+            st.markdown(f"**State**  \n{getattr(query, 'state', 'N/A')}")
+            st.markdown(f"**Query Type**  \n{getattr(query, 'query_type', 'N/A')}")
+            st.markdown(f"**Start Time**  \n{getattr(query, 'start_time', 'N/A')}")
+            st.markdown(f"**End Time**  \n{getattr(query, 'end_time', 'N/A')}")
         st.divider()
 
         # =====================================================
@@ -562,7 +570,14 @@ with st.sidebar:
 
         event_rows = []
 
-        for name, value in timeline.to_dict().items():
+        # Handle both dict and object timeline
+        timeline_dict = (
+            timeline.to_dict() 
+            if hasattr(timeline, 'to_dict') 
+            else (timeline if isinstance(timeline, dict) else {})
+        )
+
+        for name, value in timeline_dict.items():
 
             if name == "events":
                 continue
@@ -618,58 +633,39 @@ with st.sidebar:
         if total_ms > 0:
 
             planning_pct = planning_ms * 100 / total_ms
-
             admission_pct = admission_ms * 100 / total_ms
-
             execution_pct = execution_ms * 100 / total_ms
 
-            if planning_pct > 50:
-
+            if planning_pct > PLANNING_PERCENT_THRESHOLD:
                 st.warning(
-
                     f"Planning consumed {planning_pct:.1f}% of total runtime."
-
                 )
 
-            if admission_pct > 20:
-
+            if admission_pct > ADMISSION_PERCENT_THRESHOLD:
                 st.warning(
-
                     f"Admission wait consumed {admission_pct:.1f}%."
-
                 )
 
-            if execution_pct > 80:
-
+            if execution_pct > EXECUTION_PERCENT_THRESHOLD:
                 st.success(
-
                     "Execution phase dominates runtime."
-
                 )
 
-        if scan.get("files_scanned", 0) > 500:
-
+        if scan.get("files_scanned", 0) > FILES_SCANNED_THRESHOLD:
             st.warning(
-
                 f"{scan.get('files_scanned'):,} files were scanned."
-
             )
 
         if memory.get("spill_detected"):
-
             st.error(
-
                 "Memory spill detected."
-
             )
 
         if profile.query_info.state.upper() != "FINISHED":
-
             st.error(
-
                 f"Query finished with state {profile.query_info.state}"
-
             )
+
 
     # ============================================================
     # Fragment Analytics
@@ -696,36 +692,31 @@ with st.sidebar:
         for f in instances:
 
             rows.append(
-
                 {
-
-                    "Fragment": f.fragment,
-
-                    "Instance": f.instance_id,
-
-                    "Host": f.host,
-
-                    "Operator": f.operator,
-
+                    "Fragment": getattr(f, "fragment", "UNKNOWN"),
+                    "Instance": getattr(f, "instance_id", ""),
+                    "Host": getattr(f, "host", "UNKNOWN"),
+                    "Operator": getattr(f, "operator", "UNKNOWN"),  # May not exist
                     "Runtime (s)": round(
-                        f.runtime_ms / 1000,
+                        getattr(f, "runtime_ms", 0) / 1000,
                         2
                     ),
-
-                    "Rows": f.rows,
-
-                    "Read MB": f.read_mb,
-
-                    "Write MB": f.write_mb,
-
-                    "Peak Memory MB": f.peak_memory_mb,
-
-                    "Network ms": f.total_network_ms,
-
-                    "IO Wait ms": f.io_wait_ms
-
+                    "Rows": getattr(f, "rows", 0),
+                    "Read MB": round(
+                        getattr(f, "read_bytes", 0) / (1024**2),
+                        2
+                    ),
+                    "Write MB": round(
+                        getattr(f, "write_bytes", 0) / (1024**2),
+                        2
+                    ),
+                    "Peak Memory MB": round(
+                        getattr(f, "peak_memory", 0) / (1024**2),
+                        2
+                    ),
+                    "Network ms": getattr(f, "network_send_ms", 0) + getattr(f, "network_receive_ms", 0),
+                    "IO Wait ms": getattr(f, "io_wait_ms", 0)
                 }
-
             )
 
         fragment_df = pd.DataFrame(rows)
@@ -735,39 +726,32 @@ with st.sidebar:
         # --------------------------------------------------------
 
         total_fragments = len(fragment_df)
-
         total_hosts = fragment_df["Host"].nunique()
-
         avg_runtime = fragment_df["Runtime (s)"].mean()
-
         max_runtime = fragment_df["Runtime (s)"].max()
 
-        skew_ratio = (
-            max_runtime / avg_runtime
-            if avg_runtime > 0
-            else 0
-        )
+        # Safely compute skew ratio
+        if pd.isna(avg_runtime) or avg_runtime <= 0:
+            skew_ratio = 0.0
+        else:
+            skew_ratio = max_runtime / avg_runtime if pd.notna(max_runtime) else 0.0
 
         c1, c2, c3, c4 = st.columns(4)
-
         c1.metric(
             "Fragment Instances",
             total_fragments
         )
-
         c2.metric(
             "Hosts",
             total_hosts
         )
-
         c3.metric(
             "Average Runtime",
-            f"{avg_runtime:.2f}s"
+            f"{avg_runtime:.2f}s" if pd.notna(avg_runtime) else "N/A"
         )
-
         c4.metric(
             "Runtime Skew",
-            f"{skew_ratio:.2f}x"
+            f"{skew_ratio:.2f}x" if not pd.isna(skew_ratio) else "N/A"
         )
 
         if skew_ratio > 3:
@@ -1054,8 +1038,30 @@ with st.sidebar:
 
             )
 
-        except Exception:
+        except ImportError as e:
+            
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"AgGrid not available: {e}. Falling back to standard dataframe.")
 
+            st.dataframe(
+
+                leaderboard,
+
+                use_container_width=True,
+
+                height=500
+
+            )
+        
+        except Exception as e:
+            
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error rendering AgGrid: {e}", exc_info=True)
+            
+            st.error(f"Error rendering advanced table: {e}")
+            
             st.dataframe(
 
                 leaderboard,
@@ -1162,21 +1168,22 @@ with st.sidebar:
 
         st.header("CPU Utilization")
 
-        if cpu:
+        if cpu and len(cpu) > 0:
 
-            cpu_df = pd.DataFrame(cpu)
+            try:
+                cpu_df = pd.DataFrame(cpu)
+                
+                # Validate required columns exist
+                required_columns = ["host", "cpu_seconds"]
+                if not all(col in cpu_df.columns for col in required_columns):
+                    st.warning("CPU metrics are incomplete. Required columns: host, cpu_seconds")
+                    st.stop()
 
-            st.dataframe(
-                cpu_df,
-                use_container_width=True,
-                hide_index=True
-            )
-
-            if (
-                "host" in cpu_df.columns
-                and
-                "cpu_seconds" in cpu_df.columns
-            ):
+                st.dataframe(
+                    cpu_df,
+                    use_container_width=True,
+                    hide_index=True
+                )
 
                 st.bar_chart(
                     cpu_df.set_index("host")[
@@ -1189,17 +1196,9 @@ with st.sidebar:
                 ].sum()
 
                 if total_cpu > 0:
-
-                    cpu_df[
-                        "CPU %"
-                    ] = (
-                        cpu_df[
-                            "cpu_seconds"
-                        ]
-                        /
-                        total_cpu
-                        * 100
-                    )
+                    cpu_df["CPU %"] = (
+                        cpu_df["cpu_seconds"] / total_cpu * 100
+                        )
 
                     fig = px.pie(
                         cpu_df,
@@ -1214,23 +1213,23 @@ with st.sidebar:
                         use_container_width=True
                     )
 
-                    max_cpu = cpu_df[
-                        "CPU %"
-                    ].max()
+                    max_cpu = cpu_df["CPU %"].max()
 
                     if max_cpu > 80:
-
                         st.warning(
                             "CPU workload is highly concentrated on one executor."
                         )
+            
+            except Exception as e:
+                import logging
+                logging.error(f"Error processing CPU metrics: {e}", exc_info=True)
+                st.error(f"Error processing CPU metrics: {e}")
 
         else:
 
             st.info(
                 "No CPU metrics available."
             )
-
-        st.divider()
 
         # =========================================================
         # Network Analysis
@@ -2362,15 +2361,30 @@ with st.sidebar:
 
                     {
 
-                        "title": rc.title,
+                        "title": (
+                            rc.get("title") if isinstance(rc, dict) 
+                            else getattr(rc, "title", "Unknown")
+                        ),
 
-                        "severity": rc.severity,
+                        "severity": (
+                            rc.get("severity") if isinstance(rc, dict)
+                            else getattr(rc, "severity", "medium")
+                        ),
 
-                        "confidence": rc.confidence,
+                        "confidence": (
+                            rc.get("confidence") if isinstance(rc, dict)
+                            else getattr(rc, "confidence", 0.0)
+                        ),
 
-                        "impact_score": rc.impact_score,
+                        "impact_score": (
+                            rc.get("impact_score") if isinstance(rc, dict)
+                            else getattr(rc, "impact_score", 0)
+                        ),
 
-                        "evidence": rc.evidence
+                        "evidence": (
+                            rc.get("evidence") if isinstance(rc, dict)
+                            else getattr(rc, "evidence", [])
+                        )
 
                     }
 
@@ -2385,11 +2399,20 @@ with st.sidebar:
 
                     {
 
-                        "title": rec.title,
+                        "title": (
+                            rec.get("title") if isinstance(rec, dict)
+                            else getattr(rec, "title", "Unknown")
+                        ),
 
-                        "priority": rec.priority,
+                        "priority": (
+                            rec.get("priority") if isinstance(rec, dict)
+                            else getattr(rec, "priority", "medium")
+                        ),
 
-                        "description": rec.description
+                        "description": (
+                            rec.get("description") if isinstance(rec, dict)
+                            else getattr(rec, "description", "")
+                        )
 
                     }
 

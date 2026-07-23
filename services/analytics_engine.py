@@ -114,11 +114,19 @@ class AnalyticsEngine:
         # Peak Memory Analysis
         # ----------------------------------
 
+        memory_metrics = getattr(
+            profile,
+            "memory_metrics",
+            {}
+        ) or {}
+
         peak_memory = (
-            profile.memory_metrics.get(
+            memory_metrics.get(
                 "peak_memory_gb",
                 0
             )
+            if isinstance(memory_metrics, dict)
+            else 0
         )
 
         if peak_memory > 50:

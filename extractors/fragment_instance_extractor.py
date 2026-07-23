@@ -1,22 +1,23 @@
 import re
-
-from models.fragment_instance import (
-    FragmentInstance
-)
-
+from typing import List, Dict, Any
+from models.fragment_instance import FragmentInstance
 
 class FragmentInstanceExtractor:
-
-    def parse(self, text, query_id=""):
+    """
+    Extracts fragment instance information from Impala query profile text.
+    
+    A fragment instance represents a single execution of a query fragment
+    on a specific host. This extractor parses metrics including runtime,
+    memory usage, I/O wait times, and network activity.
+    """
+    
+    def parse(self, text:str, query_id: str =""):
 
         results = []
-
         current_fragment = ""
-
         lines = text.splitlines()
 
         #
-        # PASS 1
         # Build instance list
         #
         for line in lines:
@@ -69,13 +70,9 @@ class FragmentInstanceExtractor:
             )
 
             if inst and host:
-
                 obj = FragmentInstance()
-
-                obj.query_id = query_id
-
-                obj.fragment = current_fragment
-
+                obj.query_id = query_id or "UNKNOWN"
+                obj.fragment = current_fragment or "F0"
                 obj.instance_id = (
                     inst.group(1)
                 )
@@ -83,6 +80,18 @@ class FragmentInstanceExtractor:
                 obj.host = (
                     host.group(1)
                 )
+                obj.runtime_ms = 0
+                obj.rows = 0
+                obj.read_bytes = 0
+                obj.write_bytes = 0
+                obj.peak_memory = 0
+                obj.io_wait_ms = 0
+                obj.network_send_ms = 0
+                obj.network_receive_ms = 0
+                obj.spill_bytes = 0
+                obj.bytes_sent = 0
+                obj.scanner_time_ms = 0
+                obj.scanner_threads = 0
 
                 results.append(obj)
 
@@ -94,10 +103,6 @@ class FragmentInstanceExtractor:
             for x in results
         }
 
-        #
-        # PASS 2
-        # Attach metrics
-        #
         current = None
 
         for line in lines:
@@ -339,6 +344,4 @@ class FragmentInstanceExtractor:
                     scanner_threads.group(1).replace(",", "")
                 )
 
-
-            return results
-
+        return results

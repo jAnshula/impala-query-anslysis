@@ -1,20 +1,14 @@
 import re
 
-
 class ScanExtractor:
 
     def parse(self, text):
-
         result = {
-
             "bytes_read": 0,
-
             "files_scanned": 0,
-
             "partitions_scanned": 0,
-
-            "rows_returned": 0
-
+            "rows_returned": 0,
+            "rows_read": 0
         }
 
         #
@@ -28,16 +22,13 @@ class ScanExtractor:
         )
 
         if m:
-
             value = float(
                 m.group(1)
             )
-
             unit = (
                 m.group(2)
                 .upper()
             )
-
             if unit == "TB":
                 value *= 1024**4
 
@@ -62,7 +53,6 @@ class ScanExtractor:
         )
 
         if m:
-
             result["files_scanned"] = int(
                 m.group(1)
             )
@@ -78,7 +68,6 @@ class ScanExtractor:
         )
 
         if m:
-
             result["partitions_scanned"] = int(
                 m.group(1)
             )
@@ -94,11 +83,12 @@ class ScanExtractor:
         )
 
         if m:
-
-            result["rows_returned"] = int(
+            rows_val = int(
                 m.group(1)
                 .replace(",", "")
             )
+            
+            result["rows_returned"] = rows_val
+            result["rows_read"] = rows_val  # Sync both
 
         return result
-

@@ -1,65 +1,58 @@
-from dataclasses import dataclass
-from typing import Dict, Any
-
+from dataclasses import dataclass, field
 
 @dataclass
 class FragmentInstance:
-    """Represents a single Impala fragment instance execution."""
-
-    # Identity
+    """Standardized fragment instance with all metrics."""
+    
     query_id: str = ""
-    fragment: str = ""
+    fragment: str = "F0"
     instance_id: str = ""
-    host: str = ""
-    operator: str = ""
-
-    # Runtime
+    host: str = "UNKNOWN"
+    operator: str = "UNKNOWN"
+    
+    # Runtime metrics (in milliseconds)
     runtime_ms: int = 0
+    
+    # Row metrics
     rows: int = 0
-
-    # IO
+    
+    # I/O metrics (in bytes)
     read_bytes: int = 0
     write_bytes: int = 0
-    io_wait_ms: int = 0
-
-    # Memory
+    spill_bytes: int = 0
+    bytes_sent: int = 0
+    
+    # Memory metrics (in bytes)
     peak_memory: int = 0
-    spill_bytes: int = 0   # NEW
-
-    # Network
+    
+    # Wait metrics (in milliseconds)
+    io_wait_ms: int = 0
     network_send_ms: int = 0
     network_receive_ms: int = 0
-    bytes_sent: int = 0    # NEW
-
-    # Scanner
-    scanner_time_ms: int = 0   # NEW
-    scanner_threads: int = 0   # NEW
-
+    scanner_time_ms: int = 0
+    scanner_threads: int = 0
+    
+    @property
+    def read_mb(self) -> float:
+        return round(self.read_bytes / (1024**2), 2)
+    
+    @property
+    def write_mb(self) -> float:
+        return round(self.write_bytes / (1024**2), 2)
+    
+    @property
+    def peak_memory_mb(self) -> float:
+        return round(self.peak_memory / (1024**2), 2)
+    
+    @property
+    def peak_memory_gb(self) -> float:
+        return round(self.peak_memory / (1024**3), 2)
+    
     @property
     def total_network_ms(self) -> int:
         return self.network_send_ms + self.network_receive_ms
-
-    @property
-    def read_mb(self) -> float:
-        return round(self.read_bytes / (1024 * 1024), 2)
-
-    @property
-    def write_mb(self) -> float:
-        return round(self.write_bytes / (1024 * 1024), 2)
-
-    @property
-    def peak_memory_mb(self) -> float:
-        return round(self.peak_memory / (1024 * 1024), 2)
-
-    @property
-    def spill_mb(self) -> float:
-        return round(self.spill_bytes / (1024 * 1024), 2)
-
-    @property
-    def sent_mb(self) -> float:
-        return round(self.bytes_sent / (1024 * 1024), 2)
-
-    def to_dict(self) -> Dict[str, Any]:
+    
+    def to_dict(self) -> dict:
         return {
             "query_id": self.query_id,
             "fragment": self.fragment,
@@ -68,20 +61,11 @@ class FragmentInstance:
             "operator": self.operator,
             "runtime_ms": self.runtime_ms,
             "rows": self.rows,
-            "read_bytes": self.read_bytes,
-            "write_bytes": self.write_bytes,
             "read_mb": self.read_mb,
             "write_mb": self.write_mb,
-            "peak_memory": self.peak_memory,
             "peak_memory_mb": self.peak_memory_mb,
-            "spill_bytes": self.spill_bytes,
-            "spill_mb": self.spill_mb,
-            "network_send_ms": self.network_send_ms,
-            "network_receive_ms": self.network_receive_ms,
-            "total_network_ms": self.total_network_ms,
-            "bytes_sent": self.bytes_sent,
-            "sent_mb": self.sent_mb,
-            "scanner_time_ms": self.scanner_time_ms,
-            "scanner_threads": self.scanner_threads,
+            "peak_memory_gb": self.peak_memory_gb,
             "io_wait_ms": self.io_wait_ms,
+            "total_network_ms": self.total_network_ms,
+            "scanner_time_ms": self.scanner_time_ms,
         }

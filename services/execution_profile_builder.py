@@ -89,6 +89,12 @@ class ExecutionProfileBuilder:
 
         memory_metrics = MemoryExtractor().parse(text)
 
+        # Initialize peak_summary with defaults
+        peak_summary = {
+            "peak_memory_gb": 0.0,
+            "components": []
+        }
+
         # Fallback if memory extractor found nothing
         if memory_metrics.get("peak_memory_mb", 0) == 0:
 
@@ -104,12 +110,6 @@ class ExecutionProfileBuilder:
                 execution_analyzer.peak_memory_summary(
                     fragment_summary
                 )
-            )
-            
-
-            print(
-                "PEAK SUMMARY =",
-                peak_summary
             )
 
             memory_metrics["peak_memory_gb"] = (
@@ -148,16 +148,8 @@ class ExecutionProfileBuilder:
             raw_profile=text
         )
 
-        print("PEAK SUMMARY =", peak_summary)
-        print("=" * 80)
-        print("QUERY ID:", query_info.query_id)
-        print("Fragments extracted:", len(fragment_instances))
-        print("=" * 80)
-
         logger = logging.getLogger(__name__)
-
         logger.info(f"Peak summary: {peak_summary}")
         logger.debug(f"Query ID: {query_info.query_id}, Fragments: {len(fragment_instances)}")
 
         return profile
-
