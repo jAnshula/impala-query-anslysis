@@ -11,6 +11,9 @@ class QueryInfo:
     query_id: str = ""
     """Unique Impala query identifier"""
 
+    session_id: str = ""
+    """Unique Impala query session identifier"""
+
     user: str = ""
     """User who submitted the query"""
 

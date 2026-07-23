@@ -62,3 +62,9 @@ class Timeline:
     def __repr__(self) -> str:
         """String representation of Timeline."""
         return f"Timeline(events={self.events})"
+    
+    def parse_profile(self, profile: Dict[str, Any]) -> None:
+        """Parse timeline-related fields from a profile dict and add them to events."""
+        for key in ["client_fetch_ms", "metadata_ms"]:
+            if key in profile:
+                self.events[key] = profile[key]

@@ -285,5 +285,60 @@ class FragmentInstanceExtractor:
                     .replace(",", "")
                 )
 
-        return results
+            #
+            # Spill Bytes
+            #
+            spill_match = re.search(
+                r"SpilledBytes:\s*([\d,]+)",
+                line,
+                re.I
+            )
+            if spill_match:
+                current.spill_bytes = int(
+                    spill_match.group(1).replace(",", "")
+                )
+
+            #
+            # Bytes Sent
+            #
+            sent_match = re.search(
+                r"BytesSent:\s*([\d,]+)",
+                line,
+                re.I
+            )
+            if sent_match:
+                current.bytes_sent = int(
+                    sent_match.group(1).replace(",", "")
+                )
+
+            #
+            # Scanner Time
+            #
+            scanner_time = re.search(
+                r"ScannerTime:\s*([\d\.]+)(ms|s)?",
+                line,
+                re.I
+            )
+            if scanner_time:
+                value = float(scanner_time.group(1))
+                unit = scanner_time.group(2) or "ms"
+                if unit.lower() == "s":
+                    value *= 1000
+                current.scanner_time_ms = int(value)
+
+            #
+            # Scanner Threads
+            #
+            scanner_threads = re.search(
+                r"ScannerThreads:\s*([\d,]+)",
+                line,
+                re.I
+            )
+            if scanner_threads:
+                current.scanner_threads = int(
+                    scanner_threads.group(1).replace(",", "")
+                )
+
+
+            return results
 

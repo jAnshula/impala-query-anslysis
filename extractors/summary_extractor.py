@@ -26,6 +26,10 @@ class SummaryExtractor:
         duration = extract(r"Duration:\s*(.*)")
         query_type = extract(r"Query Type:\s*(.*)")
 
+        session_id = extract(
+            r"Session ID:\s*(.*)"
+        )
+
         return QueryInfo(
             query_id=query_id,
             user=user,
@@ -35,7 +39,8 @@ class SummaryExtractor:
             start_time=start_time,
             end_time=end_time,
             pool=pool,
-            query_type=query_type
+            query_type=query_type,
+            session_id=session_id
         )
 
 
